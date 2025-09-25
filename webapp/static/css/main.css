@@ -1,0 +1,43 @@
+body {
+    background: #fafafa;
+    font-family: Arial, sans-serif;
+    color: #333;
+}
+
+.content-section {
+    background: #ffffff;
+    padding: 20px 30px;
+    border: 1px solid #dddddd;
+    border-radius: 5px;
+    margin: 20px auto;
+    max-width: 600px;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.btn {
+    padding: 10px 15px;
+    border: 1px solid #17a2b8;
+    background-color: #17a2b8;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.btn:hover {
+    background-color: #138496;
+}
+
+.alert {
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 5px;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
