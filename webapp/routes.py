@@ -85,7 +85,6 @@ def login():
 
 # --- API Endpoint for User Logout ---
 @app.route("/api/logout", methods=['POST'])
-@login_required
 def logout():
     logout_user()
     return jsonify({'message': 'Logout successful'})

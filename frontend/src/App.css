@@ -1,38 +1,144 @@
-.App {
-  text-align: center;
+/* --- 1. Global Styles & Variables --- */
+:root {
+  --primary-color: #6a1b9a; /* A nice purple for Prepify */
+  --primary-hover-color: #4a148c;
+  --secondary-color: #f4f4f9;
+  --text-color: #333;
+  --border-color: #ddd;
+  --card-bg-color: #ffffff;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--secondary-color);
+  color: var(--text-color);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+/* --- 2. Navbar --- */
+.site-header {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  background-color: var(--card-bg-color);
+  padding: 1rem 2rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 2rem;
+}
+
+.site-header a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+  margin: 0 10px;
+  transition: color 0.2s ease-in-out;
+}
+
+.site-header a:hover {
+  text-decoration: underline;
+}
+
+.site-header div {
+  display: flex;
+  align-items: center;
+}
+
+/* --- 3. Content Sections & Forms (Auth, Upload, Results) --- */
+.content-section {
+  background: var(--card-bg-color);
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+
+.content-section legend {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--primary-color);
+}
+
+/* --- 4. Form Groups, Labels & Inputs --- */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.form-control, .form-control-file {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  font-size: 1rem;
+  box-sizing: border-box; /* Ensures padding doesn't affect width */
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 5px rgba(106, 27, 154, 0.2);
+}
+
+/* --- 5. Buttons --- */
+.btn {
+  display: inline-block;
+  background-color: var(--primary-color);
   color: white;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color 0.2s ease-in-out;
 }
 
-.App-link {
-  color: #61dafb;
+.btn:hover {
+  background-color: var(--primary-hover-color);
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* --- 6. Results Display (For HomePage) --- */
+.results-display {
+  margin-top: 2rem;
+}
+
+.results-display h2 {
+  color: var(--primary-color);
+}
+
+.results-display pre {
+  background-color: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 15px;
+  white-space: pre-wrap; /* Allows text to wrap */
+  word-wrap: break-word;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* --- 7. Error Messages (For Login/Register Pages) --- */
+.error-message {
+  color: #dc3545;
+  text-align: center;
+  margin-top: 1rem;
+  font-weight: 500;
 }

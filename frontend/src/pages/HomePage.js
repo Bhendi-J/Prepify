@@ -31,7 +31,7 @@ function HomePage() {
     setExtractedText('');
     try {
       const response = await apiClient.post('/api/upload', formData);
-      setExtractedText(response.data.extracted_text);
+      setExtractedText(response.data.extracted_text); // Assuming the backend returns { extracted_text: "..." }
     } catch (err) {
       setError('An error occurred during file upload. Please try again.');
       console.error(err);

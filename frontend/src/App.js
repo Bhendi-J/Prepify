@@ -6,7 +6,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AccountPage from './pages/AccountPage';
 import Navbar from './components/Navbar';
-
+import './App.css';
 function App() {
   return (
     // --- SWAP THE ORDER HERE ---

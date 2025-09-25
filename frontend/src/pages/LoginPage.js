@@ -23,7 +23,7 @@ function LoginPage() {
   return (
     <div>
       <AuthForm onSubmit={handleLogin} isLoading={isLoading} />
-      {error && <p style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
+      {error && <p className="error-message" style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
     </div>
   );
 }
