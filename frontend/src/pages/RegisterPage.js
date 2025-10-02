@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AuthForm from '../components/AuthForm';
-import axios from 'axios';
-
-axios.defaults.withCredentials = true;
+import apiClient from '../api/axiosConfig';
 
 function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -14,11 +12,11 @@ function RegisterPage() {
     setIsLoading(true);
     setError('');
     try {
-      const response = await axios.post('http://127.0.0.1:5000/api/register', {
-        username: credentials.username,
-        email: credentials.email,
-        password: credentials.password,
-      });
+      const response = await apiClient.post('/api/register', {
+           username: credentials.username,
+           email: credentials.email,
+           password: credentials.password,
+        });
 
       console.log(response.data); // Should show "User registered successfully"
       // On successful registration, redirect to the login page

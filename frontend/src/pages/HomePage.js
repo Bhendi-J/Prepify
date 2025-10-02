@@ -18,8 +18,10 @@ function HomePage() {
   const handleFileUpload = async (file) => {
     // This check now correctly prevents the upload if you're not logged in
     if (!currentUser) {
-      setError('You must be logged in to process a note.');
-      navigate('/login');
+      
+      navigate('/login', { 
+        state: { message: 'You must be logged in to process the note.' } 
+      });
       return;
     }
 

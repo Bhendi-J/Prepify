@@ -7,8 +7,7 @@ from flask_login import login_user, current_user, logout_user, login_required
 from webapp.ml_models.ocr import extract_text_from_image # Renamed to extract_text
 
 # --- API Endpoint for File Upload ---
-@app.route("/api/upload", methods=['POST'])
-@login_required # Protect this endpoint so only logged-in users can upload
+@app.route("/api/upload", methods=['POST']) # Protect this endpoint so only logged-in users can upload
 def upload_file():
     if 'note_file' not in request.files:
         return jsonify({'error': 'No file part in the request'}), 400
@@ -37,8 +36,11 @@ def upload_file():
     return jsonify({'error': 'An unknown error occurred'}), 500
 
 # --- API Endpoint for User Registration ---
-@app.route("/api/register", methods=['POST'])
+@app.route("/api/register", methods=['POST', 'OPTIONS'])
 def register():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
     if current_user.is_authenticated:
         return jsonify({'message': 'User already logged in'}), 200
 
@@ -99,3 +101,15 @@ def account():
         'email': current_user.email
     })
 
+@app.route("/api/notes", methods=['GET'])
+@login_required
+def get_notes():
+    # Get all notes from the database belonging to the current user
+    notes = StudyNote.query.filter_by(author=current_user).order_by(StudyNote.date_posted.desc()).all()
+    
+    # Convert notes to a list of dictionaries to be sent as JSON
+    notes_list = [
+        {'id': note.id, 'filename': note.filename, 'date_posted': note.date_posted} 
+        for note in notes
+    ]
+    return jsonify(notes_list)
