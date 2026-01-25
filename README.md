@@ -11,5 +11,4 @@ Prepify is a lightweight preparation tool designed to help students organize the
 ## Use Case
 Prepify is suitable for students preparing for exams, interviews, or skill assessments who need a focused and efficient preparation system.
 
-## Status
-Under active development.
+
