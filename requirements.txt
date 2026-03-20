@@ -1,0 +1,14 @@
+flask
+flask-sqlalchemy
+flask-bcrypt
+flask-login
+flask-cors
+python-dotenv
+pytesseract
+pillow
+flask-wtf
+wtforms
+email-validator
+transformers
+torch
+pypdf
