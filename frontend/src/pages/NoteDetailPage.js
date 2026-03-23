@@ -139,6 +139,16 @@ function NoteDetailPage() {
   if (isLoading) return <p style={{color: 'var(--text-secondary)', marginTop: '3rem'}}>Loading note...</p>;
   if (!note) return <p>Note not found.</p>;
 
+  const handleAddToTasks = async () => {
+    try {
+      await apiClient.post('/api/todos', { text: `Review: ${note.filename}`, note_id: note.id });
+      alert('Added to your Daily Checkpoints!');
+    } catch (e) {
+      console.error(e);
+      alert('Failed to add to tasks.');
+    }
+  };
+
   const fcSets = note.flashcard_sets || [];
   const quizSets = note.quiz_sets || [];
   const latestFC = fcSets.length > 0 ? fcSets[0] : null;
@@ -169,10 +179,15 @@ function NoteDetailPage() {
           </h1>
         )}
         
-        <span className="note-detail-meta">
-          Uploaded {new Date(note.date_posted).toLocaleDateString()}
-          {` · ${fcSets.length} flashcard set${fcSets.length !== 1 ? 's' : ''}`}
-          {` · ${quizSets.length} quiz${quizSets.length !== 1 ? 'zes' : ''}`}
+        <span className="note-detail-meta" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <span>
+            Uploaded {new Date(note.date_posted).toLocaleDateString()}
+            {` · ${fcSets.length} flashcard set${fcSets.length !== 1 ? 's' : ''}`}
+            {` · ${quizSets.length} quiz${quizSets.length !== 1 ? 'zes' : ''}`}
+          </span>
+          <button className="btn btn-ghost" onClick={handleAddToTasks} style={{ padding: '4px 12px', fontSize: '0.8rem', border: '1px solid rgba(255,255,255,0.2)' }}>
+            + Add to Daily Checkpoints
+          </button>
         </span>
       </div>
 

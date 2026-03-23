@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/axiosConfig';
 import './DashboardPage.css';
 import './AccountPage.css';
@@ -18,7 +19,6 @@ function Heatmap({ data }) {
     const count = data[key] || 0;
     const month = d.getMonth();
 
-    // Track month labels
     if (month !== lastMonth) {
       const colIndex = 364 - i;
       const weekCol = Math.floor(colIndex / 7) + 1;
@@ -66,17 +66,209 @@ function Heatmap({ data }) {
   );
 }
 
-/* ─── Weekly Trend Mini Bar Chart ─────────────────────────────────────────── */
-function WeeklyTrend({ data }) {
-  const max = Math.max(...data.map(w => w.count), 1);
+/* ─── Premium SVG Line Chart for Weekly Trend ────────────────────────────────────── */
+function LineChart({ data }) {
+  if (!data || data.length === 0) return null;
+  const max = Math.max(...data.map(d => d.count), 5); // ensure some height
+  const w = 400;
+  const h = 120;
+  const padding = 20;
+  const usableW = w - padding * 2;
+  const usableH = h - padding * 2;
+
+  // Calculate points
+  const points = data.map((d, i) => {
+    const x = padding + (i / (data.length - 1)) * usableW;
+    const y = h - padding - (d.count / max) * usableH;
+    return `${x},${y}`;
+  });
+
+  // Create a smooth curve
+  let dPath = `M ${points[0]}`;
+  for (let i = 1; i < data.length; i++) {
+    const prev = points[i - 1].split(',');
+    const curr = points[i].split(',');
+    const cp1x = parseFloat(prev[0]) + (parseFloat(curr[0]) - parseFloat(prev[0])) / 2;
+    const cp1y = parseFloat(prev[1]);
+    const cp2x = cp1x;
+    const cp2y = parseFloat(curr[1]);
+    dPath += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${curr[0]},${curr[1]}`;
+  }
+
   return (
-    <div className="trend-chart">
-      {data.map((w, i) => (
-        <div key={i} className="trend-bar-wrapper" title={`Week of ${w.week}: ${w.count}`}>
-          <div className="trend-bar" style={{ height: `${(w.count / max) * 100}%` }} />
-          <span className="trend-label">{i % 2 === 0 ? `W${i + 1}` : ''}</span>
+    <div className="line-chart-container" style={{ position: 'relative', width: '100%', height: '200px' }}>
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+        {/* Grid lines */}
+        {[0, 0.5, 1].map(pct => (
+          <line
+            key={pct}
+            x1={padding}
+            y1={h - padding - pct * usableH}
+            x2={w - padding}
+            y2={h - padding - pct * usableH}
+            stroke="rgba(255,255,255,0.05)"
+            strokeWidth="1"
+            strokeDasharray="4 4"
+          />
+        ))}
+        {/* Area under curve */}
+        <defs>
+          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
+          </linearGradient>
+        </defs>
+        <path d={`${dPath} L ${points[points.length-1].split(',')[0]},${h - padding} L ${padding},${h - padding} Z`} fill="url(#areaGradient)" />
+        {/* The curve itself */}
+        <path d={dPath} fill="none" stroke="#818cf8" strokeWidth="3" strokeLinecap="round" />
+        {/* Points */}
+        {data.map((d, i) => {
+          const coords = points[i].split(',');
+          return (
+            <circle
+              key={i}
+              cx={coords[0]}
+              cy={coords[1]}
+              r="4"
+              fill="#fff"
+              stroke="#6366f1"
+              strokeWidth="2"
+              className="chart-point"
+            >
+              <title>Week of {d.week}: {d.count} activities</title>
+            </circle>
+          );
+        })}
+      </svg>
+      <div className="chart-x-axis" style={{ display: 'flex', justifyContent: 'space-between', padding: '0 20px', marginTop: '10px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+        <span>12 wks ago</span>
+        <span>This Week</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── To-Do List (Daily Checkpoints) ────────────────────────────────────────────── */
+function TodoList() {
+  const [todos, setTodos] = useState([]);
+  const [notes, setNotes] = useState([]);
+  const [newTodo, setNewTodo] = useState('');
+  const [selectedNoteId, setSelectedNoteId] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchTodos();
+    fetchNotes();
+  }, []);
+
+  const fetchTodos = async () => {
+    try {
+      const res = await apiClient.get('/api/todos');
+      setTodos(res.data);
+    } catch (e) { console.error('Failed to fetch todos'); }
+  };
+
+  const fetchNotes = async () => {
+    try {
+      const res = await apiClient.get('/api/notes');
+      setNotes(res.data);
+    } catch (e) { console.error('Failed to fetch notes'); }
+  };
+
+  const addTodo = async (e) => {
+    e.preventDefault();
+    if (!newTodo.trim()) return;
+    try {
+      const payload = { text: newTodo };
+      if (selectedNoteId) payload.note_id = parseInt(selectedNoteId);
+      const res = await apiClient.post('/api/todos', payload);
+      setTodos([...todos, res.data]);
+      setNewTodo('');
+      setSelectedNoteId('');
+    } catch (e) { console.error('Failed to add todo'); }
+  };
+
+  const toggleTodo = async (id, currentStatus) => {
+    try {
+      const res = await apiClient.patch(`/api/todos/${id}`, { completed: !currentStatus });
+      setTodos(todos.map(t => t.id === id ? res.data : t));
+    } catch (e) { console.error('Failed to toggle todo'); }
+  };
+
+  const deleteTodo = async (id) => {
+    try {
+      await apiClient.delete(`/api/todos/${id}`);
+      setTodos(todos.filter(t => t.id !== id));
+    } catch (e) { console.error('Failed to delete todo'); }
+  };
+
+  const progress = todos.length === 0 ? 0 : Math.round((todos.filter(t => t.completed).length / todos.length) * 100);
+
+  return (
+    <div className="todo-container">
+      <div className="todo-header">
+        <h3 style={{ margin: 0, fontSize: '1rem' }}>Daily Checkpoints</h3>
+        <span className="todo-progress-text">{progress}% Completed</span>
+      </div>
+      
+      <div className="todo-progress-bar">
+        <div className="todo-progress-fill" style={{ width: `${progress}%` }} />
+      </div>
+
+      <form onSubmit={addTodo} className="todo-form" style={{ flexDirection: 'column' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input 
+            type="text" 
+            placeholder="Add a new task..." 
+            value={newTodo} 
+            onChange={e => setNewTodo(e.target.value)} 
+            className="todo-input"
+          />
+          <button type="submit" className="todo-add-btn">Add</button>
         </div>
-      ))}
+        <select 
+          className="todo-input" 
+          style={{ padding: '6px 10px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}
+          value={selectedNoteId}
+          onChange={e => setSelectedNoteId(e.target.value)}
+        >
+          <option value="">(Optional) Link a Note...</option>
+          {notes.map(n => <option key={n.id} value={n.id}>{n.filename}</option>)}
+        </select>
+      </form>
+
+      <div className="todo-list">
+        {todos.length === 0 ? (
+          <p className="todo-empty">All caught up! Add a task above.</p>
+        ) : (
+          todos.map(todo => (
+            <div key={todo.id} className={`todo-item ${todo.completed ? 'completed' : ''}`}>
+              <label className="todo-label">
+                <input 
+                  type="checkbox" 
+                  checked={todo.completed} 
+                  onChange={() => toggleTodo(todo.id, todo.completed)} 
+                />
+                <span className="todo-checkbox"></span>
+                <span 
+                  className="todo-text" 
+                  style={{ cursor: todo.note_id ? 'pointer' : 'default', textDecoration: todo.completed ? 'line-through' : (todo.note_id ? 'underline' : 'none'), color: todo.note_id && !todo.completed ? '#818cf8' : 'inherit' }}
+                  onClick={(e) => {
+                    if (todo.note_id) {
+                      e.preventDefault();
+                      navigate(`/notes/${todo.note_id}`);
+                    }
+                  }}
+                  title={todo.note_id ? "Click to open linked note" : ""}
+                >
+                  {todo.text} {todo.note_id && '📎'}
+                </span>
+              </label>
+              <button className="todo-delete" onClick={() => deleteTodo(todo.id)}>✕</button>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -88,9 +280,10 @@ function BreakdownBars({ breakdown }) {
     { key: 'upload', label: 'Uploads', color: '#6366f1', icon: '' },
     { key: 'flashcard', label: 'Flashcards', color: '#818cf8', icon: '' },
     { key: 'quiz', label: 'Quizzes', color: '#34d399', icon: '' },
+    { key: 'todo', label: 'To-Dos', color: '#f59e0b', icon: '' },
   ];
   return (
-    <div className="breakdown-list">
+    <div className="breakdown-list" style={{ marginTop: '1.5rem' }}>
       {items.map(item => {
         const count = breakdown[item.key] || 0;
         const pct = ((count / total) * 100).toFixed(0);
@@ -140,71 +333,81 @@ function AccountPage() {
         <button className="btn btn-ghost" style={{ color: '#f87171', marginLeft: 'auto' }} onClick={logout}>Logout</button>
       </div>
 
-      {/* Highlight Stats */}
-      <div className="highlight-row">
-        <div className="highlight-card glass-panel">
-          <span className="highlight-icon">Streak</span>
-          <span className="highlight-value">{stats.streak || 0}</span>
-          <span className="highlight-label">Days</span>
+      {/* Row: Highlights + Todo List */}
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 5fr) minmax(0, 3fr)', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        
+        {/* Left Column: Highlights & Graph */}
+        <div className="left-col" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* Highlight Stats */}
+          <div className="highlight-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <div className="highlight-card glass-panel">
+              <span className="highlight-icon">Streak</span>
+              <span className="highlight-value">{stats.streak || 0}</span>
+              <span className="highlight-label">Days</span>
+            </div>
+            <div className="highlight-card glass-panel">
+              <span className="highlight-icon">This Wk</span>
+              <span className="highlight-value">{stats.this_week || 0}</span>
+              <span className="highlight-label">Activity</span>
+            </div>
+            <div className="highlight-card glass-panel">
+              <span className="highlight-icon">This Mo</span>
+              <span className="highlight-value">{stats.this_month || 0}</span>
+              <span className="highlight-label">Activity</span>
+            </div>
+            <div className="highlight-card glass-panel">
+              <span className="highlight-icon">Total</span>
+              <span className="highlight-value">{stats.total_activities || 0}</span>
+              <span className="highlight-label">All Time</span>
+            </div>
+          </div>
+
+          {/* Line Chart */}
+          <div className="glass-panel" style={{ padding: '1.75rem', flex: 1 }}>
+            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>Activity Trend</h3>
+            <LineChart data={weeklyTrend} />
+          </div>
+
         </div>
-        <div className="highlight-card glass-panel">
-          <span className="highlight-icon">This Wk</span>
-          <span className="highlight-value">{stats.this_week || 0}</span>
-          <span className="highlight-label">Activity</span>
+
+        {/* Right Column: Todo List */}
+        <div className="glass-panel" style={{ padding: '1.75rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <TodoList />
         </div>
-        <div className="highlight-card glass-panel">
-          <span className="highlight-icon">This Mo</span>
-          <span className="highlight-value">{stats.this_month || 0}</span>
-          <span className="highlight-label">Activity</span>
-        </div>
-        <div className="highlight-card glass-panel">
-          <span className="highlight-icon">Total</span>
-          <span className="highlight-value">{stats.total_activities || 0}</span>
-          <span className="highlight-label">All Time</span>
-        </div>
+
       </div>
 
-      {/* Totals */}
-      <div className="stats-row">
-        <div className="stat-card glass-panel">
-          <span className="stat-value">{stats.total_folders || 0}</span>
-          <span className="stat-label">Folders</span>
+      {/* Activity Heatmap + Breakdown */}
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 5fr) minmax(0, 3fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+        
+        <div className="glass-panel" style={{ padding: '1.75rem' }}>
+          <div className="section-header">
+            <h3>Study Heatmap</h3>
+            {mostActive.date && (
+              <span className="section-meta">Most active: {new Date(mostActive.date).toLocaleDateString()} ({mostActive.count} activities)</span>
+            )}
+          </div>
+          <Heatmap data={analytics?.heatmap || {}} />
         </div>
-        <div className="stat-card glass-panel">
-          <span className="stat-value">{stats.total_notes || 0}</span>
-          <span className="stat-label">Notes</span>
-        </div>
-        <div className="stat-card glass-panel">
-          <span className="stat-value">{stats.total_flashcards || 0}</span>
-          <span className="stat-label">Flashcard Sets</span>
-        </div>
-        <div className="stat-card glass-panel">
-          <span className="stat-value">{stats.total_quizzes || 0}</span>
-          <span className="stat-label">Quizzes</span>
-        </div>
-      </div>
 
-      {/* Activity Heatmap */}
-      <div className="glass-panel" style={{ padding: '1.75rem', marginBottom: '1.5rem' }}>
-        <div className="section-header">
-          <h3>Study Activity</h3>
-          {mostActive.date && (
-            <span className="section-meta">Most active: {new Date(mostActive.date).toLocaleDateString()} ({mostActive.count} activities)</span>
-          )}
-        </div>
-        <Heatmap data={analytics?.heatmap || {}} />
-      </div>
-
-      {/* Bottom Row: Breakdown + Trend */}
-      <div className="analytics-bottom-row">
-        <div className="glass-panel" style={{ padding: '1.75rem', flex: 1 }}>
-          <h3 style={{ marginBottom: '1.25rem', fontSize: '1rem' }}>Activity Breakdown</h3>
+        <div className="glass-panel" style={{ padding: '1.75rem' }}>
+          <h3 style={{ margin: '0', fontSize: '1rem' }}>Activity Breakdown</h3>
           <BreakdownBars breakdown={breakdown} />
+          
+          {/* Some small totals at the bottom of breakdown */}
+          <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{stats.total_folders || 0}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Folders</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{stats.total_notes || 0}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Notes</div>
+            </div>
+          </div>
         </div>
-        <div className="glass-panel" style={{ padding: '1.75rem', flex: 1 }}>
-          <h3 style={{ marginBottom: '1.25rem', fontSize: '1rem' }}>Last 12 Weeks</h3>
-          <WeeklyTrend data={weeklyTrend} />
-        </div>
+
       </div>
     </div>
   );

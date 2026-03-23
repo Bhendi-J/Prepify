@@ -4,6 +4,8 @@
 
 .account-page {
   animation: fadeIn 0.5s ease;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 /* Profile Card */
@@ -43,9 +45,7 @@
 /* Highlight Stats Row */
 .highlight-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  margin-bottom: 1.5rem;
 }
 
 .highlight-card {
@@ -58,7 +58,10 @@
 }
 
 .highlight-icon {
-  font-size: 1.5rem;
+  font-size: 0.8rem;
+  color: #818cf8;
+  font-weight: 600;
+  text-transform: uppercase;
   margin-bottom: 4px;
 }
 
@@ -78,22 +81,18 @@
   font-weight: 600;
 }
 
-/* Section header */
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
+/* SVG Line Chart */
+.line-chart-container {
+  overflow: hidden;
+  border-radius: 8px;
 }
-
-.section-header h3 {
-  margin: 0;
-  font-size: 1rem;
+.chart-point {
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
-
-.section-meta {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+.chart-point:hover {
+  r: 6;
+  fill: #6366f1;
 }
 
 /* ─── Improved Heatmap ─── */
@@ -186,16 +185,11 @@
 }
 
 /* ─── Activity Breakdown ─── */
-.breakdown-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
 .breakdown-row {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-bottom: 12px;
 }
 
 .breakdown-label {
@@ -224,51 +218,162 @@
   transition: width 0.8s ease;
 }
 
-/* ─── Weekly Trend Chart ─── */
-.trend-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-  height: 100px;
-  padding-top: 8px;
-}
-
-.trend-bar-wrapper {
-  flex: 1;
+/* ─── To-Do List (Daily Checkpoints) ─── */
+.todo-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
   height: 100%;
-  justify-content: flex-end;
-  gap: 4px;
 }
-
-.trend-bar {
-  width: 100%;
-  min-height: 4px;
-  border-radius: 4px 4px 2px 2px;
-  background: linear-gradient(180deg, #818cf8, #6366f1);
-  transition: height 0.6s ease;
+.todo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
 }
-
-.trend-label {
-  font-size: 0.6rem;
+.todo-progress-text {
+  font-size: 0.8rem;
+  color: #34d399;
+  font-weight: 600;
+}
+.todo-progress-bar {
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+.todo-progress-fill {
+  height: 100%;
+  background: #34d399;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.todo-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 1.5rem;
+}
+.todo-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+.todo-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  background: rgba(255, 255, 255, 0.06);
+}
+.todo-add-btn {
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.todo-add-btn:hover {
+  background: #4f46e5;
+}
+.todo-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+.todo-empty {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: 2rem;
+}
+.todo-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+.todo-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.todo-item.completed {
+  opacity: 0.6;
+}
+.todo-item.completed .todo-text {
+  text-decoration: line-through;
   color: var(--text-secondary);
 }
-
-/* ─── Bottom Row ─── */
-.analytics-bottom-row {
+.todo-label {
   display: flex;
-  gap: 16px;
-  margin-bottom: 2rem;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  flex: 1;
+}
+.todo-label input {
+  display: none;
+}
+.todo-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--text-secondary);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.todo-label input:checked + .todo-checkbox {
+  background: #34d399;
+  border-color: #34d399;
+}
+.todo-label input:checked + .todo-checkbox::after {
+  content: '✓';
+  color: black;
+  font-size: 14px;
+  font-weight: 900;
+}
+.todo-text {
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+.todo-delete {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  padding: 4px;
+}
+.todo-item:hover .todo-delete {
+  opacity: 1;
+}
+.todo-delete:hover {
+  color: #f87171;
 }
 
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
 @media (max-width: 768px) {
   .highlight-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .analytics-bottom-row {
-    flex-direction: column;
+    grid-template-columns: repeat(2, 1fr) !important;
   }
   .hm-grid {
     grid-template-columns: repeat(26, 1fr);

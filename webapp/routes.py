@@ -275,7 +275,7 @@ def analytics():
     this_month = sum(1 for a in activities if a.date >= month_start)
 
     # Activity breakdown by type
-    breakdown = {'upload': 0, 'flashcard': 0, 'quiz': 0}
+    breakdown = {'upload': 0, 'flashcard': 0, 'quiz': 0, 'todo': 0}
     for act in activities:
         if act.action_type in breakdown:
             breakdown[act.action_type] += 1
@@ -377,3 +377,60 @@ def logout():
 @login_required
 def account():
     return jsonify({'username': current_user.username, 'email': current_user.email})
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#   TODO ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/todos", methods=['GET', 'POST', 'OPTIONS'])
+@login_required
+def handle_todos():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    if request.method == 'GET':
+        todos = Todo.query.filter_by(user_id=current_user.id).order_by(Todo.date_created.asc()).all()
+        return jsonify([{'id': t.id, 'text': t.text, 'completed': t.completed, 'note_id': t.note_id} for t in todos]), 200
+    if request.method == 'POST':
+        data = request.get_json()
+        if not data or not data.get('text'):
+             return jsonify({'error': 'Missing text'}), 400
+        new_todo = Todo(
+            text=data['text'], 
+            user_id=current_user.id,
+            note_id=data.get('note_id')
+        )
+        db.session.add(new_todo)
+        db.session.commit()
+        return jsonify({'id': new_todo.id, 'text': new_todo.text, 'completed': new_todo.completed, 'note_id': new_todo.note_id}), 201
+
+@app.route("/api/notes", methods=['GET', 'OPTIONS'])
+@login_required
+def get_all_notes():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    notes = StudyNote.query.filter_by(user_id=current_user.id).all()
+    return jsonify([{'id': n.id, 'filename': n.filename} for n in notes]), 200
+
+@app.route("/api/todos/<int:todo_id>", methods=['PATCH', 'DELETE', 'OPTIONS'])
+@login_required
+def modify_todo(todo_id):
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    todo = Todo.query.get_or_404(todo_id)
+    if todo.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    if request.method == 'DELETE':
+        db.session.delete(todo)
+        db.session.commit()
+        return jsonify({'message': 'Todo deleted'})
+    if request.method == 'PATCH':
+        data = request.get_json()
+        if 'completed' in data:
+            # If transitioning to completed, log it in the heatmap
+            if data['completed'] and not todo.completed:
+                db.session.add(StudyActivity(action_type='todo', user=current_user))
+            todo.completed = data['completed']
+        if 'text' in data:
+            todo.text = data['text']
+        db.session.commit()
+        return jsonify({'id': todo.id, 'text': todo.text, 'completed': todo.completed, 'note_id': todo.note_id})

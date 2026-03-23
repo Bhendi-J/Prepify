@@ -12,6 +12,7 @@ class User(db.Model, UserMixin):
     folders = db.relationship('Folder', backref='owner', lazy=True)
     notes = db.relationship('StudyNote', backref='author', lazy=True)
     activities = db.relationship('StudyActivity', backref='user', lazy=True)
+    todos = db.relationship('Todo', backref='user', lazy=True)
 
     def __repr__(self):
         return f"User('{self.username}', '{self.email}')"
@@ -78,3 +79,15 @@ class StudyActivity(db.Model):
 
     def __repr__(self):
         return f"StudyActivity('{self.action_type}', '{self.date}')"
+
+# ─── Todo ────────────────────────────────────────────────────────────────────
+class Todo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.String(200), nullable=False)
+    completed = db.Column(db.Boolean, default=False)
+    date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    note_id = db.Column(db.Integer, db.ForeignKey('study_note.id'), nullable=True)
+
+    def __repr__(self):
+        return f"Todo('{self.text}', '{self.completed}')"
