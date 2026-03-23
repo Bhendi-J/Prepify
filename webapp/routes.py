@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from flask import request, jsonify
 from werkzeug.utils import secure_filename
 from webapp import app, db, bcrypt_
-from webapp.models import User, Folder, StudyNote, FlashcardSet, QuizSet, StudyActivity
+from webapp.models import User, Folder, StudyNote, FlashcardSet, QuizSet, StudyActivity, Todo
 from flask_login import login_user, current_user, logout_user, login_required
 from webapp.ml_models.ocr import extract_text_from_image
 from webapp.ml_models.summariser import summarize_text, generate_flashcards, generate_quiz, generate_title
@@ -292,6 +292,13 @@ def analytics():
         count = sum(1 for a in activities if w_start <= a.date <= w_end)
         weekly_trend.append({'week': w_start.isoformat(), 'count': count})
 
+    # Last 7 days for daily graph
+    last_7_days = []
+    for d in range(6, -1, -1):
+        target_date = today - timedelta(days=d)
+        cnt = heatmap.get(target_date.isoformat(), 0)
+        last_7_days.append({"day": target_date.strftime("%a"), "count": cnt})
+
     # Totals
     total_notes = StudyNote.query.filter_by(user_id=current_user.id).count()
     total_flashcards = FlashcardSet.query.join(StudyNote).filter(StudyNote.user_id == current_user.id).count()
@@ -314,8 +321,22 @@ def analytics():
         'breakdown': breakdown,
         'most_active': {'date': most_active_day, 'count': most_active_count},
         'weekly_trend': weekly_trend,
+        'last_7_days': last_7_days,
     }), 200
 
+@app.route("/api/daily_summary", methods=['GET'])
+@login_required
+def daily_summary():
+    from webapp.ml_models.summariser import generate_daily_summary
+    today = date.today()
+    activities = StudyActivity.query.filter_by(user_id=current_user.id, date=today).all()
+    stats = {'upload': 0, 'flashcard': 0, 'quiz': 0, 'todo': 0}
+    for act in activities:
+        if act.action_type in stats:
+            stats[act.action_type] += 1
+    
+    summary_text = generate_daily_summary(stats)
+    return jsonify({"summary": summary_text}), 200
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #   AUTH ENDPOINTS

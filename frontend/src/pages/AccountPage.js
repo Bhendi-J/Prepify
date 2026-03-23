@@ -191,14 +191,25 @@ function TodoList() {
   const toggleTodo = async (id, currentStatus) => {
     try {
       const res = await apiClient.patch(`/api/todos/${id}`, { completed: !currentStatus });
-      setTodos(todos.map(t => t.id === id ? res.data : t));
-    } catch (e) { console.error('Failed to toggle todo'); }
+      setTodos(prev => prev.map(t => t.id === id ? res.data : t));
+
+      // After checking it, vanish after 2.5s
+      if (!currentStatus) {
+        setTimeout(() => {
+          apiClient.delete(`/api/todos/${id}`).then(() => {
+            setTodos(prev => prev.filter(t => t.id !== id));
+          }).catch(e => console.error(e));
+        }, 2500);
+      }
+    } catch (e) {
+      console.error('Failed to toggle todo', e.response?.data || e.message);
+    }
   };
 
   const deleteTodo = async (id) => {
     try {
       await apiClient.delete(`/api/todos/${id}`);
-      setTodos(todos.filter(t => t.id !== id));
+      setTodos(prev => prev.filter(t => t.id !== id));
     } catch (e) { console.error('Failed to delete todo'); }
   };
 
@@ -273,6 +284,80 @@ function TodoList() {
   );
 }
 
+/* ─── Daily AI Summary ──────────────────────────────────────────────────────── */
+function DailySummary() {
+  const [summary, setSummary] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiClient.get('/api/daily_summary')
+      .then(res => setSummary(res.data.summary))
+      .catch(() => setSummary("Keep up the great work studying today!"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="glass-panel" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '150px', height: '150px', background: 'radial-gradient(circle, rgba(99,102,241,0.2) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
+      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 1 }}>
+        <span style={{ color: '#818cf8' }}>✨</span> Daily Insights
+      </h3>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', zIndex: 1 }}>
+        {loading ? (
+          <div className="shimmer-text" style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', lineHeight: '1.6' }}>
+            Analyzing today's activity...
+          </div>
+        ) : (
+          <p style={{ margin: 0, fontSize: '1.1rem', lineHeight: '1.6', color: 'var(--text-primary)', fontWeight: '500' }}>
+            "{summary}"
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── 7-Day Bar Chart ────────────────────────────────────────────────────────── */
+function DailyChart({ data }) {
+  if (!data || data.length === 0) return null;
+  const max = Math.max(...data.map(d => d.count), 5); // Ensure some height
+
+  return (
+    <div className="glass-panel" style={{ padding: '1.75rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1rem' }}>Last 7 Days</h3>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: '10px', justifyContent: 'space-between', height: '120px' }}>
+        {data.map((d, i) => {
+          const heightPct = (d.count / max) * 100;
+          return (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, height: '100%' }}>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', width: '100%', paddingBottom: '8px' }}>
+                <div 
+                  style={{ 
+                    width: '100%', 
+                    height: `${Math.max(heightPct, 4)}%`, 
+                    background: d.count > 0 ? 'linear-gradient(180deg, #818cf8 0%, #6366f1 100%)' : 'rgba(255,255,255,0.05)',
+                    borderRadius: '4px',
+                    transition: 'height 0.5s ease',
+                    position: 'relative'
+                  }}
+                  title={`${d.count} activities`}
+                >
+                  {d.count > 0 && (
+                    <span style={{ position: 'absolute', top: '-20px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      {d.count}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{d.day}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Activity Breakdown Bars ─────────────────────────────────────────────── */
 function BreakdownBars({ breakdown }) {
   const total = Object.values(breakdown).reduce((a, b) => a + b, 0) || 1;
@@ -331,6 +416,12 @@ function AccountPage() {
           <p>{currentUser.email}</p>
         </div>
         <button className="btn btn-ghost" style={{ color: '#f87171', marginLeft: 'auto' }} onClick={logout}>Logout</button>
+      </div>
+
+      {/* Row: Daily Insights & 7-Day Graph */}
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <DailySummary />
+        <DailyChart data={analytics?.last_7_days || []} />
       </div>
 
       {/* Row: Highlights + Todo List */}

@@ -160,3 +160,17 @@ def _parse_json_response(response, label="data"):
     except json.JSONDecodeError:
         print(f"Failed to parse {label} JSON: {response[:200]}")
         return []
+
+# ─── Daily Summary Generation ────────────────────────────────────────────────
+
+def generate_daily_summary(stats):
+    """Generate a motivational, short daily summary based on study activities."""
+    system_prompt = (
+        "You are an encouraging AI study buddy. Based on the user's statistics for today, "
+        "write a short, 2-sentence motivational summary. Use a friendly, natural tone. "
+        "Do not use markdown formatting like bolding or lists."
+    )
+    prompt = f"Today's stats:\nUploads: {stats.get('upload', 0)}\nTodos Completed: {stats.get('todo', 0)}\nFlashcard Sets Generated: {stats.get('flashcard', 0)}\nQuizzes Generated: {stats.get('quiz', 0)}\nCurrent Streak: {stats.get('streak', 0)} days.\n\nWrite a short, engaging 2-sentence summary of my day."
+    
+    result = generate_from_ollama(prompt, system=system_prompt)
+    return result.strip() if result else "Keep up the great work studying today!"
