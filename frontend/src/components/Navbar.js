@@ -1,21 +1,19 @@
-import React, { useContext } from 'react'; 
-import { NavLink, Link } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext'; 
+import React, { useContext } from 'react';
+import { NavLink } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
 
 function Navbar() {
-  const { currentUser, logout } = useContext(AuthContext); 
+  const { currentUser, logout } = useContext(AuthContext);
 
   return (
     <nav className="navbar">
-      <Link to="/" className="brand">Prepify</Link>
-      
+      <NavLink to="/" className="brand">Prepify</NavLink>
       <div className="nav-links">
         {currentUser ? (
           <>
-            <NavLink to="/" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} end>Home</NavLink>
-            <NavLink to="/notes" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>My Notes</NavLink>
+            <NavLink to="/" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} end>Dashboard</NavLink>
+            <NavLink to="/library" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>My Library</NavLink>
             <NavLink to="/account" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Account</NavLink>
-            
             <button onClick={logout} className="btn btn-ghost" style={{marginLeft: '15px'}}>Logout</button>
           </>
         ) : (

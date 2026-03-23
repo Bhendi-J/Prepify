@@ -1,0 +1,185 @@
+/* ============================
+   Library / Folders Page Styles
+   ============================ */
+
+.library-page {
+  animation: fadeIn 0.5s ease;
+}
+
+.library-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2.5rem;
+}
+
+.library-header h1 {
+  font-size: 2.2rem;
+  margin-bottom: 0.25rem;
+  background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.library-header p {
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+/* Create folder form */
+.create-folder-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.create-folder-form input {
+  padding: 10px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  width: 200px;
+}
+
+.create-folder-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Folder grid */
+.folders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.folder-card {
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: var(--transition-normal);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.folder-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.folder-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.folder-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.folder-meta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.folder-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+/* Folder detail (notes list) */
+.folder-detail-page {
+  animation: fadeIn 0.5s ease;
+}
+
+.folder-detail-header {
+  margin-bottom: 2rem;
+}
+
+.folder-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  background: none;
+  border: none;
+  font-family: 'Inter', sans-serif;
+  padding: 0;
+}
+
+.folder-detail-back:hover {
+  color: var(--text-primary);
+}
+
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.note-list-item {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.note-list-item:hover {
+  background: var(--bg-surface-hover);
+}
+
+.note-list-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.note-list-info h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.note-list-info small {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.note-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.badge {
+  font-size: 0.7rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-fc {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+}
+
+.badge-quiz {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+}

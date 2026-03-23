@@ -1,8 +1,11 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import DashboardPage from './pages/DashboardPage'; 
-import MyNotesPage from './pages/MyNotesPage';
+
+import DashboardPage from './pages/DashboardPage';
+import LibraryPage from './pages/LibraryPage';
+import FolderDetailPage from './pages/FolderDetailPage';
+import NoteDetailPage from './pages/NoteDetailPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AccountPage from './pages/AccountPage';
@@ -17,7 +20,9 @@ function App() {
         <div className="container">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
-            <Route path="/notes" element={<MyNotesPage />} />
+            <Route path="/library" element={<LibraryPage />} />
+            <Route path="/library/:folderId" element={<FolderDetailPage />} />
+            <Route path="/notes/:noteId" element={<NoteDetailPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/account" element={<AccountPage />} />

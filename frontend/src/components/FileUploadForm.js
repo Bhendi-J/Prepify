@@ -39,9 +39,9 @@ function FileUploadForm({ onUpload, isLoading }) {
       >
         {isLoading ? (
           <span style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-             Processing with AI...
+             Processing...
           </span>
-        ) : 'Summarize Document'}
+        ) : 'Summarize'}
       </button>
     </form>
   );

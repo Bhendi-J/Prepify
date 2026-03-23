@@ -5,6 +5,10 @@ function NoteCard({ note, onRefresh }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isGeneratingFC, setIsGeneratingFC] = useState(false);
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+
   const formattedDate = new Date(note.date_posted).toLocaleDateString(undefined, {
     year: 'numeric', month: 'short', day: 'numeric'
   });
@@ -13,12 +17,40 @@ function NoteCard({ note, onRefresh }) {
     try {
       setIsDeleting(true);
       await apiClient.delete(`/api/notes/${note.id}`);
-      onRefresh(); // Trigger parent MyNotesPage.js to reload the notes instantly
+      onRefresh();
     } catch (error) {
       console.error("Failed to delete note:", error);
       alert("Failed to delete the note. Please try again.");
       setIsDeleting(false);
       setShowConfirm(false);
+    }
+  };
+
+  const handleGenerateFlashcards = async () => {
+    try {
+      setIsGeneratingFC(true);
+      setSuccessMsg('');
+      await apiClient.post('/api/flashcards', { text: note.original_content, title: note.filename });
+      setSuccessMsg('Flashcards created! View them in the Flashcards tab.');
+    } catch (error) {
+      console.error("Failed to generate flashcards:", error);
+      alert("Failed to generate flashcards. Make sure Ollama is running!");
+    } finally {
+      setIsGeneratingFC(false);
+    }
+  };
+
+  const handleGenerateQuiz = async () => {
+    try {
+      setIsGeneratingQuiz(true);
+      setSuccessMsg('');
+      await apiClient.post('/api/quizzes', { text: note.original_content, title: note.filename });
+      setSuccessMsg('Quiz created! View it in the Quizzes tab.');
+    } catch (error) {
+      console.error("Failed to generate quiz:", error);
+      alert("Failed to generate quiz. Make sure Ollama is running!");
+    } finally {
+      setIsGeneratingQuiz(false);
     }
   };
 
@@ -31,8 +63,24 @@ function NoteCard({ note, onRefresh }) {
       </div>
 
       {isExpanded && (
-        <div className="text-content-wrapper" style={{marginBottom: '1.5rem', marginTop: '0.5rem'}}>
+        <div className="text-content-wrapper" style={{marginBottom: '1rem', marginTop: '0.5rem'}}>
           {note.original_content || 'No content to display.'}
+        </div>
+      )}
+
+      {successMsg && (
+        <div style={{
+          background: 'rgba(52, 211, 153, 0.1)',
+          border: '1px solid rgba(52, 211, 153, 0.25)',
+          color: '#34d399',
+          padding: '10px 16px',
+          borderRadius: 'var(--radius-md)',
+          fontSize: '0.9rem',
+          fontWeight: '500',
+          marginBottom: '1rem',
+          animation: 'fadeIn 0.3s ease'
+        }}>
+          {successMsg}
         </div>
       )}
 
@@ -56,11 +104,11 @@ function NoteCard({ note, onRefresh }) {
             <button className="btn btn-ghost" onClick={() => setIsExpanded(!isExpanded)}>
               {isExpanded ? 'Hide Note' : 'View Note'}
             </button>
-            <button className="btn" onClick={() => alert('Flashcard Generator coming soon!')}>
-              Generate Flashcards
+            <button className="btn" onClick={handleGenerateFlashcards} disabled={isGeneratingFC || isGeneratingQuiz}>
+              {isGeneratingFC ? 'Generating...' : 'Flashcards'}
             </button>
-            <button className="btn" style={{backgroundColor: '#818cf8', boxShadow: '0 4px 12px rgba(129, 140, 248, 0.3)'}} onClick={() => alert('Quiz Generator coming soon!')}>
-              Generate Quiz
+            <button className="btn" style={{backgroundColor: '#818cf8', boxShadow: '0 4px 12px rgba(129, 140, 248, 0.3)'}} onClick={handleGenerateQuiz} disabled={isGeneratingFC || isGeneratingQuiz}>
+              {isGeneratingQuiz ? 'Generating...' : 'Quiz'}
             </button>
             <button 
               className="btn btn-ghost" 
