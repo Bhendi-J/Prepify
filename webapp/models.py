@@ -80,14 +80,28 @@ class StudyActivity(db.Model):
     def __repr__(self):
         return f"StudyActivity('{self.action_type}', '{self.date}')"
 
+# ─── WeeklyGoal ──────────────────────────────────────────────────────────────
+class WeeklyGoal(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    description = db.Column(db.Text, nullable=False)
+    completed = db.Column(db.Boolean, default=False)
+    date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    todos = db.relationship('Todo', backref='goal', lazy=True)
+
+    def __repr__(self):
+        return f"WeeklyGoal('{self.description}', '{self.completed}')"
+
 # ─── Todo ────────────────────────────────────────────────────────────────────
 class Todo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.String(200), nullable=False)
     completed = db.Column(db.Boolean, default=False)
     date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    target_date = db.Column(db.Date, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     note_id = db.Column(db.Integer, db.ForeignKey('study_note.id'), nullable=True)
+    goal_id = db.Column(db.Integer, db.ForeignKey('weekly_goal.id'), nullable=True)
 
     def __repr__(self):
         return f"Todo('{self.text}', '{self.completed}')"

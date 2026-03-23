@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from flask import request, jsonify
 from werkzeug.utils import secure_filename
 from webapp import app, db, bcrypt_
-from webapp.models import User, Folder, StudyNote, FlashcardSet, QuizSet, StudyActivity, Todo
+from webapp.models import User, Folder, StudyNote, FlashcardSet, QuizSet, StudyActivity, Todo, WeeklyGoal
 from flask_login import login_user, current_user, logout_user, login_required
 from webapp.ml_models.ocr import extract_text_from_image
 from webapp.ml_models.summariser import summarize_text, generate_flashcards, generate_quiz, generate_title
@@ -410,7 +410,7 @@ def handle_todos():
         return jsonify({'status': 'ok'}), 200
     if request.method == 'GET':
         todos = Todo.query.filter_by(user_id=current_user.id).order_by(Todo.date_created.asc()).all()
-        return jsonify([{'id': t.id, 'text': t.text, 'completed': t.completed, 'note_id': t.note_id} for t in todos]), 200
+        return jsonify([{'id': t.id, 'text': t.text, 'completed': t.completed, 'note_id': t.note_id, 'target_date': str(t.target_date) if t.target_date else None} for t in todos]), 200
     if request.method == 'POST':
         data = request.get_json()
         if not data or not data.get('text'):
@@ -454,4 +454,69 @@ def modify_todo(todo_id):
         if 'text' in data:
             todo.text = data['text']
         db.session.commit()
+
+        # Goal Completion Check
+        if todo.goal_id and todo.completed:
+            goal = WeeklyGoal.query.get(todo.goal_id)
+            if goal and not goal.completed:
+                incomplete_todos = Todo.query.filter_by(goal_id=goal.id, completed=False).count()
+                if incomplete_todos == 0:
+                    goal.completed = True
+                    db.session.commit()
+
         return jsonify({'id': todo.id, 'text': todo.text, 'completed': todo.completed, 'note_id': todo.note_id})
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#   WEEKLY GOAL ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/goals", methods=['GET', 'OPTIONS'])
+@login_required
+def get_goal():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    goal = WeeklyGoal.query.filter_by(user_id=current_user.id, completed=False).order_by(WeeklyGoal.date_created.desc()).first()
+    if not goal:
+        return jsonify(None), 200
+    
+    total = Todo.query.filter_by(goal_id=goal.id).count()
+    done = Todo.query.filter_by(goal_id=goal.id, completed=True).count()
+    return jsonify({
+        'id': goal.id,
+        'description': goal.description,
+        'progress': round((done / total * 100) if total > 0 else 0)
+    }), 200
+
+@app.route("/api/goals", methods=['POST'])
+@login_required
+def create_goal():
+    data = request.get_json()
+    if not data or not data.get('paragraph'):
+        return jsonify({'error': 'Missing paragraph'}), 400
+    
+    # 1. Ask AI to break paragraph down into tasks
+    from webapp.ml_models.summariser import generate_goal_tasks
+    tasks = generate_goal_tasks(data['paragraph'])
+    if not tasks:
+        return jsonify({'error': 'Failed to parse AI output'}), 500
+        
+    # 2. Create the WeeklyGoal
+    goal = WeeklyGoal(description=data['paragraph'], user_id=current_user.id)
+    db.session.add(goal)
+    db.session.flush() # get goal.id
+    
+    # 3. Create mapping to daily tasks
+    today = date.today()
+    for t in tasks:
+        offset = t.get('day_offset', 0)
+        task_date = today + timedelta(days=offset)
+        new_todo = Todo(
+            text=t.get('text', 'Study Task'),
+            user_id=current_user.id,
+            goal_id=goal.id,
+            target_date=task_date
+        )
+        db.session.add(new_todo)
+        
+    db.session.commit()
+    return jsonify({'message': 'Goal created mapped to daily tasks successfully.'}), 201

@@ -254,32 +254,125 @@ function TodoList() {
         ) : (
           todos.map(todo => (
             <div key={todo.id} className={`todo-item ${todo.completed ? 'completed' : ''}`}>
-              <label className="todo-label">
+              <label className="todo-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
                 <input 
                   type="checkbox" 
                   checked={todo.completed} 
                   onChange={() => toggleTodo(todo.id, todo.completed)} 
                 />
                 <span className="todo-checkbox"></span>
-                <span 
-                  className="todo-text" 
-                  style={{ cursor: todo.note_id ? 'pointer' : 'default', textDecoration: todo.completed ? 'line-through' : (todo.note_id ? 'underline' : 'none'), color: todo.note_id && !todo.completed ? '#818cf8' : 'inherit' }}
-                  onClick={(e) => {
-                    if (todo.note_id) {
-                      e.preventDefault();
-                      navigate(`/notes/${todo.note_id}`);
-                    }
-                  }}
-                  title={todo.note_id ? "Click to open linked note" : ""}
-                >
-                  {todo.text} {todo.note_id && '📎'}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span 
+                    className="todo-text" 
+                    style={{ cursor: todo.note_id ? 'pointer' : 'default', textDecoration: todo.completed ? 'line-through' : (todo.note_id ? 'underline' : 'none'), color: todo.note_id && !todo.completed ? '#818cf8' : 'inherit' }}
+                    onClick={(e) => {
+                      if (todo.note_id) {
+                        e.preventDefault();
+                        navigate(`/notes/${todo.note_id}`);
+                      }
+                    }}
+                    title={todo.note_id ? "Click to open linked note" : ""}
+                  >
+                    {todo.text} {todo.note_id && '📎'}
+                  </span>
+                  {todo.target_date && (
+                    <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: '500' }}>
+                      Target: {new Date(todo.target_date).toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'})}
+                    </span>
+                  )}
+                </div>
               </label>
               <button className="todo-delete" onClick={() => deleteTodo(todo.id)}>✕</button>
             </div>
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+/* ─── Weekly Goal Planner (NLP) ────────────────────────────────────────────── */
+function WeeklyGoalPlanner({ onGoalGenerated }) {
+  const [goal, setGoal] = useState(null);
+  const [inputText, setInputText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+
+  useEffect(() => {
+    fetchGoal();
+  }, []);
+
+  const fetchGoal = () => {
+    apiClient.get('/api/goals').then(res => {
+      setGoal(res.data);
+      setFetching(false);
+    }).catch(() => setFetching(false));
+  };
+
+  const handleGenerate = async () => {
+    if (!inputText.trim()) return;
+    setLoading(true);
+    try {
+      await apiClient.post('/api/goals', { paragraph: inputText });
+      setInputText('');
+      fetchGoal(); 
+      if (onGoalGenerated) onGoalGenerated();
+    } catch(e) {
+      console.error(e);
+      alert('Failed to generate goal plan.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (fetching) return <div className="glass-panel" style={{padding: '1.5rem'}}><div className="shimmer-text">Loading Goal...</div></div>;
+
+  return (
+    <div className="glass-panel" style={{ padding: '1.75rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+      <h3 style={{ margin: 0, fontSize: '1rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        🎯 Weekly AI Goal Planner
+      </h3>
+      
+      {goal ? (
+        <div>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}><strong>Goal:</strong> {goal.description}</p>
+          <div style={{ marginTop: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
+              <span>Progress</span>
+              <span style={{ color: '#34d399', fontWeight: 'bold' }}>{goal.progress}%</span>
+            </div>
+            <div style={{ height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', background: '#34d399', width: `${goal.progress}%`, transition: 'width 0.4s ease' }} />
+            </div>
+          </div>
+          {goal.progress === 100 && (
+             <p style={{ color: '#34d399', fontWeight: 'bold', marginTop: '1rem', textAlign: 'center' }}>🎉 Goal Completed! Awesome job.</p>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0 }}>
+            Type out what you want to achieve this week. The AI will break it down into daily tasks for you.
+          </p>
+          <textarea
+            rows="3"
+            className="todo-input"
+            placeholder="e.g. I want to read my biology notes and study my physics flashcards..."
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            disabled={loading}
+            style={{ resize: 'none' }}
+          />
+          <button 
+            className="todo-add-btn" 
+            style={{ alignSelf: 'flex-start', background: '#f59e0b', padding: '6px 16px' }}
+            onClick={handleGenerate}
+            disabled={loading}
+          >
+            {loading ? 'Mapping AI Plan...' : 'Generate Daily Plan ✨'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -417,6 +510,9 @@ function AccountPage() {
         </div>
         <button className="btn btn-ghost" style={{ color: '#f87171', marginLeft: 'auto' }} onClick={logout}>Logout</button>
       </div>
+
+      {/* AI Weekly Planner */}
+      <WeeklyGoalPlanner onGoalGenerated={() => { window.location.reload(); }} />
 
       {/* Row: Daily Insights & 7-Day Graph */}
       <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>

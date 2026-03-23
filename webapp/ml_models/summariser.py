@@ -174,3 +174,19 @@ def generate_daily_summary(stats):
     
     result = generate_from_ollama(prompt, system=system_prompt)
     return result.strip() if result else "Keep up the great work studying today!"
+
+# ─── NLP Weekly Goal Breakdown ────────────────────────────────────────────────
+def generate_goal_tasks(paragraph):
+    """Break a paragraph describing weekly goals into actionable daily tasks."""
+    system_prompt = (
+        "You are an AI study planner. The user will provide a paragraph of their study goals for the week. "
+        "Break this down into a list of actionable tasks spread across the next 7 days. "
+        "Your output MUST be a valid JSON array of objects. "
+        "Each object must have exactly two keys: 'text' (a brief string task description) and 'day_offset' "
+        "(an integer from 0 to 6 representing how many days from today the task should be done). "
+        "Ensure there are at least 3-5 tasks evenly spaced out. "
+        "Do NOT output any other text or markdown fences other than the raw JSON."
+    )
+    prompt = f"Weekly Goal Details:\n{paragraph}"
+    response = generate_from_ollama(prompt, system=system_prompt)
+    return _parse_json_response(response, "goal_tasks")
