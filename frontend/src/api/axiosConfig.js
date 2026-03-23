@@ -1,8 +1,9 @@
 import axios from 'axios';
 
+const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001';
+
 const apiClient = axios.create({
-  // --- CHANGE THIS LINE ---
-  baseURL: 'http://localhost:5001', // Use localhost instead of 127.0.0.1
+  baseURL: apiBaseUrl,
   withCredentials: true,
 });
 
@@ -10,10 +11,18 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // If unauthorized, the user's session is invalid (e.g. wiped database)
-      // Redirect to home/login so the React app re-initializes AuthContext
-      if (window.location.pathname !== '/') {
-        window.location.href = '/';
+      const requestUrl = error.config?.url || '';
+      const skipRedirect =
+        requestUrl.includes('/api/login') ||
+        requestUrl.includes('/api/register') ||
+        requestUrl.includes('/api/account');
+
+      // Keep auth-form and bootstrapping failures local to their screens.
+      if (!skipRedirect) {
+        const publicPaths = ['/', '/login', '/register'];
+        if (!publicPaths.includes(window.location.pathname)) {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

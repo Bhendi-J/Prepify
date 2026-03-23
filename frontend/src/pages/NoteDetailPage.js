@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import apiClient from '../api/axiosConfig';
@@ -34,7 +34,7 @@ function QuizQuestion({ q, idx, onAnswer }) {
     if (answered) return;
     setSelected(opt);
     setAnswered(true);
-    onAnswer(opt === q.answer);
+    onAnswer(idx, opt, opt === q.answer);
   };
 
   const getClass = (opt) => {
@@ -74,12 +74,15 @@ function NoteDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [quizScores, setQuizScores] = useState({});
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [quizAttemptHistory, setQuizAttemptHistory] = useState([]);
+  const [isSubmittingAttempt, setIsSubmittingAttempt] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const { currentUser } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const fetchNote = async () => {
+  const fetchNote = useCallback(async () => {
     try {
       setIsLoading(true);
       const res = await apiClient.get(`/api/notes/${noteId}`);
@@ -90,11 +93,11 @@ function NoteDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [noteId]);
 
   useEffect(() => {
     if (currentUser) fetchNote();
-  }, [currentUser, noteId]);
+  }, [currentUser, fetchNote]);
 
   const handleSaveTitle = async () => {
     setIsEditingTitle(false);
@@ -125,6 +128,8 @@ function NoteDetailPage() {
   const handleGenerateQuiz = async () => {
     try {
       setIsGenerating(true);
+      setQuizScores({});
+      setQuizAnswers({});
       await apiClient.post(`/api/notes/${noteId}/quiz`);
       await fetchNote();
       setActiveTab('quiz');
@@ -134,6 +139,31 @@ function NoteDetailPage() {
       setIsGenerating(false);
     }
   };
+
+  const fcSets = note?.flashcard_sets || [];
+  const quizSets = note?.quiz_sets || [];
+  const latestFC = fcSets.length > 0 ? fcSets[0] : null;
+  const latestQuiz = quizSets.length > 0 ? quizSets[0] : null;
+
+  const fetchQuizAttempts = async (quizSetId) => {
+    try {
+      const res = await apiClient.get(`/api/quiz_sets/${quizSetId}/attempts?page=1&limit=10`);
+      setQuizAttemptHistory(res.data?.items || []);
+    } catch (err) {
+      console.error(err);
+      setQuizAttemptHistory([]);
+    }
+  };
+
+  useEffect(() => {
+    setQuizScores({});
+    setQuizAnswers({});
+    if (latestQuiz?.id) {
+      fetchQuizAttempts(latestQuiz.id);
+    } else {
+      setQuizAttemptHistory([]);
+    }
+  }, [latestQuiz?.id]);
 
   if (!currentUser) return null;
   if (isLoading) return <p style={{color: 'var(--text-secondary)', marginTop: '3rem'}}>Loading note...</p>;
@@ -149,14 +179,27 @@ function NoteDetailPage() {
     }
   };
 
-  const fcSets = note.flashcard_sets || [];
-  const quizSets = note.quiz_sets || [];
-  const latestFC = fcSets.length > 0 ? fcSets[0] : null;
-  const latestQuiz = quizSets.length > 0 ? quizSets[0] : null;
+  const handleSubmitAttempt = async () => {
+    if (!latestQuiz) return;
+    try {
+      setIsSubmittingAttempt(true);
+      const response = await apiClient.post(`/api/quiz_sets/${latestQuiz.id}/attempts`, {
+        answers: quizAnswers
+      });
+      setQuizAttemptHistory(prev => [response.data, ...prev]);
+      alert(`Saved score: ${response.data.score}/${response.data.total_questions}`);
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || 'Failed to save quiz attempt.');
+    } finally {
+      setIsSubmittingAttempt(false);
+    }
+  };
 
   const totalQuizQ = latestQuiz?.content?.length || 0;
   const correctCount = Object.values(quizScores).filter(Boolean).length;
   const progress = totalQuizQ > 0 ? (Object.keys(quizScores).length / totalQuizQ) * 100 : 0;
+  const allAnswered = totalQuizQ > 0 && Object.keys(quizAnswers).length === totalQuizQ;
 
   return (
     <div className="note-detail">
@@ -262,8 +305,46 @@ function NoteDetailPage() {
                 </div>
                 <div className="detail-quiz-list">
                   {latestQuiz.content?.map((q, i) => (
-                    <QuizQuestion key={i} q={q} idx={i} onAnswer={(c) => setQuizScores(p => ({...p, [i]: c}))} />
+                    <QuizQuestion
+                      key={i}
+                      q={q}
+                      idx={i}
+                      onAnswer={(questionIdx, selected, isCorrect) => {
+                        setQuizScores(prev => ({ ...prev, [questionIdx]: isCorrect }));
+                        setQuizAnswers(prev => ({ ...prev, [questionIdx]: selected }));
+                      }}
+                    />
                   ))}
+                </div>
+                <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    className="btn"
+                    style={{ backgroundColor: '#34d399' }}
+                    disabled={!allAnswered || isSubmittingAttempt}
+                    onClick={handleSubmitAttempt}
+                  >
+                    {isSubmittingAttempt ? 'Saving...' : 'Save Attempt'}
+                  </button>
+                </div>
+
+                <div className="glass-panel" style={{ marginTop: '1rem', padding: '1rem' }}>
+                  <h4 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Attempt History</h4>
+                  {quizAttemptHistory.length === 0 ? (
+                    <p style={{ margin: 0, color: 'var(--text-secondary)' }}>No attempts saved yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {quizAttemptHistory.map((attempt) => (
+                        <div key={attempt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
+                          <span>
+                            {attempt.score}/{attempt.total_questions}
+                          </span>
+                          <span style={{ color: 'var(--text-secondary)' }}>
+                            {new Date(attempt.date_attempted).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </>
             ) : (

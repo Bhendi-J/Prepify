@@ -1,57 +1,103 @@
-// AuthContext.js
-
 import React, { createContext, useState, useEffect } from 'react';
-// Make sure apiClient is imported
 import apiClient from '../api/axiosConfig';
-import { useNavigate } from 'react-router-dom';
-// You can remove the generic axios import if apiClient is used everywhere
-// import axios from 'axios'; 
-// axios.defaults.withCredentials = true; // This is already handled in apiClient
 
 export const AuthContext = createContext();
+
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 7000;
+
+const withTimeout = (promise, timeoutMs) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Auth bootstrap timed out')), timeoutMs)
+    ),
+  ]);
+
+const navigateTo = (path) => {
+  if (window.location.pathname === path) return;
+  window.history.pushState({}, '', path);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+};
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   const login = async (credentials) => {
-    // This is already correct
     const response = await apiClient.post('/api/login', credentials);
-    if (response.data.user) {
+    if (response.data?.user) {
       setCurrentUser(response.data.user);
-      navigate('/');
+      navigateTo('/');
     }
     return response;
   };
 
   const logout = async () => {
-    // --- CHANGE THIS ---
-    // Use apiClient which points to localhost:5000
-    await apiClient.post('/api/logout'); 
-    setCurrentUser(null);
-    navigate('/');
+    try {
+      await apiClient.post('/api/logout');
+    } catch (err) {
+      // Keep logout resilient even if the server session already expired.
+      console.error('Logout request failed', err);
+    } finally {
+      setCurrentUser(null);
+      navigateTo('/');
+    }
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkLoggedIn = async () => {
       try {
-        // --- AND CHANGE THIS ---
-        // Use apiClient for consistency
-        const response = await apiClient.get('/api/account'); 
-        setCurrentUser(response.data);
+        const response = await withTimeout(
+          apiClient.get('/api/account'),
+          AUTH_BOOTSTRAP_TIMEOUT_MS
+        );
+        if (isMounted) {
+          const payload = response.data || {};
+          if (payload.authenticated && payload.user) {
+            setCurrentUser(payload.user);
+          } else if (payload.username && payload.email) {
+            // Backward compatibility with older account response shape.
+            setCurrentUser({ username: payload.username, email: payload.email });
+          } else {
+            setCurrentUser(null);
+          }
+        }
       } catch (err) {
-        setCurrentUser(null);
+        if (isMounted) {
+          setCurrentUser(null);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
+
     checkLoggedIn();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // ... rest of the file is the same
   if (loading) {
-    return <div>Loading Application...</div>;
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          color: '#e2e8f0',
+          background: '#0f172a',
+          fontFamily: 'Inter, sans-serif',
+          fontSize: '1rem',
+        }}
+      >
+        Loading application...
+      </div>
+    );
   }
 
   return (

@@ -4,13 +4,17 @@ All inference is done via HTTP calls to the local Ollama instance.
 """
 
 import json
+import os
+import time
 import urllib.request
 import urllib.error
 import math
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-DEFAULT_MODEL = "qwen2.5:3b"
+OLLAMA_URL = os.getenv('OLLAMA_URL', "http://localhost:11434/api/generate")
+DEFAULT_MODEL = os.getenv('OLLAMA_MODEL', "qwen2.5:3b")
 CHUNK_SIZE = 1500  # words per chunk
+OLLAMA_TIMEOUT_SECONDS = int(os.getenv('OLLAMA_TIMEOUT_SECONDS', '45'))
+OLLAMA_MAX_RETRIES = int(os.getenv('OLLAMA_MAX_RETRIES', '2'))
 
 
 # ─── Core Ollama Client ─────────────────────────────────────────────────────
@@ -25,13 +29,17 @@ def generate_from_ollama(prompt, model=DEFAULT_MODEL, system=""):
     }
     req = urllib.request.Request(OLLAMA_URL, data=json.dumps(data).encode('utf-8'))
     req.add_header('Content-Type', 'application/json')
-    try:
-        with urllib.request.urlopen(req, timeout=120) as response:
-            result = json.loads(response.read().decode('utf-8'))
-            return result.get("response", "")
-    except urllib.error.URLError as e:
-        print(f"Ollama API Error: {e}")
-        return None
+    for attempt in range(OLLAMA_MAX_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=OLLAMA_TIMEOUT_SECONDS) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                return result.get("response", "")
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
+            print(f"Ollama API Error (attempt {attempt + 1}/{OLLAMA_MAX_RETRIES + 1}): {e}")
+            if attempt < OLLAMA_MAX_RETRIES:
+                time.sleep(0.6 * (attempt + 1))
+            else:
+                return None
 
 
 # ─── Title Generation ────────────────────────────────────────────────────────

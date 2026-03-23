@@ -13,6 +13,7 @@ class User(db.Model, UserMixin):
     notes = db.relationship('StudyNote', backref='author', lazy=True)
     activities = db.relationship('StudyActivity', backref='user', lazy=True)
     todos = db.relationship('Todo', backref='user', lazy=True)
+    quiz_attempts = db.relationship('QuizAttempt', backref='user', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f"User('{self.username}', '{self.email}')"
@@ -28,7 +29,7 @@ class Folder(db.Model):
     date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
-    notes = db.relationship('StudyNote', backref='folder', lazy=True)
+    notes = db.relationship('StudyNote', backref='folder', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f"Folder('{self.name}')"
@@ -42,8 +43,8 @@ class StudyNote(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     folder_id = db.Column(db.Integer, db.ForeignKey('folder.id'), nullable=True)
 
-    flashcard_sets = db.relationship('FlashcardSet', backref='note', lazy=True)
-    quiz_sets = db.relationship('QuizSet', backref='note', lazy=True)
+    flashcard_sets = db.relationship('FlashcardSet', backref='note', lazy=True, cascade='all, delete-orphan')
+    quiz_sets = db.relationship('QuizSet', backref='note', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f"StudyNote('{self.filename}', '{self.date_posted}')"
@@ -66,9 +67,23 @@ class QuizSet(db.Model):
     content = db.Column(db.Text, nullable=False)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     note_id = db.Column(db.Integer, db.ForeignKey('study_note.id'), nullable=False)
+    attempts = db.relationship('QuizAttempt', backref='quiz_set', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f"QuizSet('{self.title}')"
+
+
+class QuizAttempt(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    score = db.Column(db.Integer, nullable=False)
+    total_questions = db.Column(db.Integer, nullable=False)
+    answers_json = db.Column(db.Text, nullable=False)
+    date_attempted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    quiz_set_id = db.Column(db.Integer, db.ForeignKey('quiz_set.id'), nullable=False)
+
+    def __repr__(self):
+        return f"QuizAttempt(user_id={self.user_id}, quiz_set_id={self.quiz_set_id}, score={self.score})"
 
 # ─── StudyActivity ───────────────────────────────────────────────────────────
 class StudyActivity(db.Model):

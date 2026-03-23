@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import apiClient from '../api/axiosConfig';
@@ -13,7 +13,7 @@ function FolderDetailPage() {
   const { currentUser } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const fetchFolder = async () => {
+  const fetchFolder = useCallback(async () => {
     try {
       setIsLoading(true);
       const res = await apiClient.get(`/api/folders/${folderId}/notes`);
@@ -23,11 +23,11 @@ function FolderDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [folderId]);
 
   useEffect(() => {
     if (currentUser) fetchFolder();
-  }, [currentUser, folderId]);
+  }, [currentUser, fetchFolder]);
 
   const handleUpload = async (file) => {
     try {

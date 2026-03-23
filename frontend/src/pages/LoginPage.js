@@ -1,20 +1,19 @@
-import React, { useState, useContext } from 'react'; // <-- Add useContext
-import { AuthContext } from '../context/AuthContext'; // <-- Import the context
+import React, { useState, useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
 import AuthForm from '../components/AuthForm';
 
 function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { login } = useContext(AuthContext); // <-- Get the global login function
+  const { login } = useContext(AuthContext);
 
   const handleLogin = async (credentials) => {
     setIsLoading(true);
     setError('');
     try {
-      await login(credentials); // <-- Use the context's login function
+      await login(credentials);
     } catch (err) {
       setError('Invalid email or password. Please try again.');
-      console.error(err);
     } finally {
       setIsLoading(false);
     }

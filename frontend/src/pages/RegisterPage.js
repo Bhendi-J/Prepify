@@ -12,18 +12,14 @@ function RegisterPage() {
     setIsLoading(true);
     setError('');
     try {
-      const response = await apiClient.post('/api/register', {
-           username: credentials.username,
-           email: credentials.email,
-           password: credentials.password,
-        });
-
-      console.log(response.data); // Should show "User registered successfully"
-      // On successful registration, redirect to the login page
+      await apiClient.post('/api/register', {
+        username: credentials.username,
+        email: credentials.email,
+        password: credentials.password,
+      });
       navigate('/login');
     } catch (err) {
       setError('Registration failed. The email or username may already be taken.');
-      console.error(err);
     } finally {
       setIsLoading(false);
     }

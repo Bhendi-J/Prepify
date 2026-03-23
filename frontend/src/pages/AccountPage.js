@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/axiosConfig';
@@ -149,7 +149,7 @@ function LineChart({ data }) {
 }
 
 /* ─── To-Do List (Daily Checkpoints) ────────────────────────────────────────────── */
-function TodoList() {
+function TodoList({ refreshToken }) {
   const [todos, setTodos] = useState([]);
   const [notes, setNotes] = useState([]);
   const [newTodo, setNewTodo] = useState('');
@@ -159,7 +159,7 @@ function TodoList() {
   useEffect(() => {
     fetchTodos();
     fetchNotes();
-  }, []);
+  }, [refreshToken]);
 
   const fetchTodos = async () => {
     try {
@@ -170,7 +170,7 @@ function TodoList() {
 
   const fetchNotes = async () => {
     try {
-      const res = await apiClient.get('/api/notes');
+      const res = await apiClient.get('/api/notes?minimal=1');
       setNotes(res.data);
     } catch (e) { console.error('Failed to fetch notes'); }
   };
@@ -292,7 +292,7 @@ function TodoList() {
 }
 
 /* ─── Weekly Goal Planner (NLP) ────────────────────────────────────────────── */
-function WeeklyGoalPlanner({ onGoalGenerated }) {
+function WeeklyGoalPlanner({ onGoalGenerated, refreshToken }) {
   const [goal, setGoal] = useState(null);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -300,7 +300,7 @@ function WeeklyGoalPlanner({ onGoalGenerated }) {
 
   useEffect(() => {
     fetchGoal();
-  }, []);
+  }, [refreshToken]);
 
   const fetchGoal = () => {
     apiClient.get('/api/goals').then(res => {
@@ -378,7 +378,7 @@ function WeeklyGoalPlanner({ onGoalGenerated }) {
 }
 
 /* ─── Daily AI Summary ──────────────────────────────────────────────────────── */
-function DailySummary() {
+function DailySummary({ refreshToken }) {
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -387,7 +387,7 @@ function DailySummary() {
       .then(res => setSummary(res.data.summary))
       .catch(() => setSummary("Keep up the great work studying today!"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshToken]);
 
   return (
     <div className="glass-panel" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', overflow: 'hidden' }}>
@@ -485,12 +485,21 @@ function BreakdownBars({ breakdown }) {
 function AccountPage() {
   const { currentUser, logout } = useContext(AuthContext);
   const [analytics, setAnalytics] = useState(null);
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  const fetchAnalytics = useCallback(() => {
+    if (!currentUser) return;
+    apiClient.get('/api/analytics').then(res => setAnalytics(res.data)).catch(() => {});
+  }, [currentUser]);
+
+  const handleGoalGenerated = () => {
+    setRefreshToken(prev => prev + 1);
+    fetchAnalytics();
+  };
 
   useEffect(() => {
-    if (currentUser) {
-      apiClient.get('/api/analytics').then(res => setAnalytics(res.data)).catch(() => {});
-    }
-  }, [currentUser]);
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
   if (!currentUser) return <p style={{ textAlign: 'center', marginTop: '4rem' }}>Please log in.</p>;
 
@@ -512,11 +521,11 @@ function AccountPage() {
       </div>
 
       {/* AI Weekly Planner */}
-      <WeeklyGoalPlanner onGoalGenerated={() => { window.location.reload(); }} />
+      <WeeklyGoalPlanner onGoalGenerated={handleGoalGenerated} refreshToken={refreshToken} />
 
       {/* Row: Daily Insights & 7-Day Graph */}
       <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-        <DailySummary />
+        <DailySummary refreshToken={refreshToken} />
         <DailyChart data={analytics?.last_7_days || []} />
       </div>
 
@@ -560,7 +569,7 @@ function AccountPage() {
 
         {/* Right Column: Todo List */}
         <div className="glass-panel" style={{ padding: '1.75rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <TodoList />
+          <TodoList refreshToken={refreshToken} />
         </div>
 
       </div>

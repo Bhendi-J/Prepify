@@ -1,13 +1,71 @@
 import os
 import json
+import uuid
 from datetime import date, timedelta
-from flask import request, jsonify
+from flask import request, jsonify, abort, send_from_directory
 from werkzeug.utils import secure_filename
 from webapp import app, db, bcrypt_
-from webapp.models import User, Folder, StudyNote, FlashcardSet, QuizSet, StudyActivity, Todo, WeeklyGoal
+from webapp.models import User, Folder, StudyNote, FlashcardSet, QuizSet, QuizAttempt, StudyActivity, Todo, WeeklyGoal
 from flask_login import login_user, current_user, logout_user, login_required
 from webapp.ml_models.ocr import extract_text_from_image
 from webapp.ml_models.summariser import summarize_text, generate_flashcards, generate_quiz, generate_title
+
+
+MAX_UPLOAD_SIZE_BYTES = 15 * 1024 * 1024
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg'}
+ALLOWED_MIMETYPES = {
+    'text/plain',
+    'application/pdf',
+    'image/png',
+    'image/jpeg'
+}
+
+
+def _safe_load_json(raw, default):
+    if not raw:
+        return default
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return default
+
+
+def _serialize_quiz_attempt(attempt):
+    return {
+        'id': attempt.id,
+        'score': attempt.score,
+        'total_questions': attempt.total_questions,
+        'answers': _safe_load_json(attempt.answers_json, {}),
+        'date_attempted': attempt.date_attempted
+    }
+
+
+def _frontend_build_missing_response():
+    return (
+        'Frontend build is missing. Run "npm run build" in the "frontend" directory and restart Flask.',
+        503,
+        {'Content-Type': 'text/plain; charset=utf-8'}
+    )
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    if path.startswith('api/'):
+        abort(404)
+
+    build_dir = app.config.get('FRONTEND_BUILD_DIR')
+    index_path = app.config.get('FRONTEND_INDEX_PATH')
+
+    if not index_path or not os.path.exists(index_path):
+        return _frontend_build_missing_response()
+
+    if path:
+        asset_path = os.path.join(build_dir, path)
+        if os.path.isfile(asset_path):
+            return send_from_directory(build_dir, path)
+
+    return send_from_directory(build_dir, 'index.html')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -79,7 +137,11 @@ def folder_notes(folder_id):
 @app.route("/api/notes", methods=['GET'])
 @login_required
 def get_notes():
+    minimal = request.args.get('minimal', '0') == '1'
     notes = StudyNote.query.filter_by(author=current_user).order_by(StudyNote.date_posted.desc()).all()
+    if minimal:
+        return jsonify([{'id': n.id, 'filename': n.filename} for n in notes]), 200
+
     result = [{
         'id': n.id,
         'filename': n.filename,
@@ -100,15 +162,18 @@ def get_note_detail(note_id):
     if note.user_id != current_user.id:
         return jsonify({'error': 'Unauthorized'}), 403
 
+    flashcard_sets = sorted(note.flashcard_sets, key=lambda fs: fs.date_posted, reverse=True)
+    quiz_sets = sorted(note.quiz_sets, key=lambda qs: qs.date_posted, reverse=True)
+
     flashcards = [{
         'id': fs.id, 'title': fs.title,
-        'content': json.loads(fs.content), 'date_posted': fs.date_posted
-    } for fs in note.flashcard_sets]
+        'content': _safe_load_json(fs.content, []), 'date_posted': fs.date_posted
+    } for fs in flashcard_sets]
 
     quizzes = [{
         'id': qs.id, 'title': qs.title,
-        'content': json.loads(qs.content), 'date_posted': qs.date_posted
-    } for qs in note.quiz_sets]
+        'content': _safe_load_json(qs.content, []), 'date_posted': qs.date_posted
+    } for qs in quiz_sets]
 
     return jsonify({
         'id': note.id,
@@ -160,36 +225,65 @@ def upload_file():
         return jsonify({'error': 'No file selected'}), 400
 
     folder_id = request.form.get('folder_id', type=int)
+    if folder_id is not None:
+        folder = Folder.query.get(folder_id)
+        if not folder or folder.user_id != current_user.id:
+            return jsonify({'error': 'Invalid folder'}), 400
 
     if file:
-        filename = secure_filename(file.filename)
+        original_filename = secure_filename(file.filename)
+        ext = os.path.splitext(original_filename)[1].lower().lstrip('.')
+        if ext not in ALLOWED_EXTENSIONS:
+            return jsonify({'error': 'Unsupported file type'}), 400
+
+        mimetype = (file.mimetype or '').lower()
+        if mimetype not in ALLOWED_MIMETYPES:
+            return jsonify({'error': 'Unsupported file MIME type'}), 400
+
+        # Read length from stream safely; reset pointer after check.
+        file.stream.seek(0, os.SEEK_END)
+        file_size = file.stream.tell()
+        file.stream.seek(0)
+        if file_size > MAX_UPLOAD_SIZE_BYTES:
+            return jsonify({'error': 'File too large (max 15 MB)'}), 413
+
+        unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
         upload_path = os.path.join(app.root_path, 'uploads')
         os.makedirs(upload_path, exist_ok=True)
-        file_path = os.path.join(upload_path, filename)
-        file.save(file_path)
+        file_path = os.path.join(upload_path, unique_filename)
 
-        extracted_text = extract_text_from_image(file_path)
-        if not extracted_text:
-            return jsonify({'error': 'Could not extract text from the file'}), 500
+        try:
+            file.save(file_path)
 
-        summary = summarize_text(extracted_text)
-        
-        # Generate AI title, fallback to filename
-        ai_title = generate_title(summary)
-        note_title = ai_title if ai_title else filename
-        
-        new_note = StudyNote(
-            filename=note_title,
-            original_content=summary,
-            author=current_user,
-            folder_id=folder_id
-        )
-        db.session.add(new_note)
-        # Track activity
-        db.session.add(StudyActivity(action_type='upload', user=current_user))
-        db.session.commit()
+            extracted_text = extract_text_from_image(file_path)
+            if not extracted_text or not extracted_text.strip():
+                return jsonify({'error': 'Could not extract text from the file'}), 422
 
-        return jsonify({'extracted_text': summary, 'note_id': new_note.id, 'title': note_title})
+            summary = summarize_text(extracted_text)
+            if not summary or not summary.strip():
+                return jsonify({'error': 'Could not summarize extracted text'}), 422
+
+            # Generate AI title, fallback to uploaded filename (without path prefix).
+            ai_title = generate_title(summary)
+            note_title = ai_title if ai_title else os.path.splitext(original_filename)[0]
+
+            new_note = StudyNote(
+                filename=note_title[:100],
+                original_content=summary,
+                author=current_user,
+                folder_id=folder_id
+            )
+            db.session.add(new_note)
+            db.session.add(StudyActivity(action_type='upload', user=current_user))
+            db.session.commit()
+
+            return jsonify({'extracted_text': summary, 'note_id': new_note.id, 'title': note_title})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 500
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
     return jsonify({'error': 'An unknown error occurred'}), 500
 
@@ -234,6 +328,66 @@ def generate_note_quiz(note_id):
         return jsonify({'id': new_set.id, 'content': quiz}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route("/api/quiz_sets/<int:quiz_set_id>/attempts", methods=['GET', 'POST', 'OPTIONS'])
+@login_required
+def quiz_attempts(quiz_set_id):
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
+    quiz_set = QuizSet.query.get_or_404(quiz_set_id)
+    if quiz_set.note.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    if request.method == 'GET':
+        page = max(request.args.get('page', 1, type=int), 1)
+        limit = request.args.get('limit', 10, type=int)
+        limit = min(max(limit, 1), 50)
+
+        base_query = QuizAttempt.query.filter_by(
+            quiz_set_id=quiz_set.id,
+            user_id=current_user.id
+        ).order_by(QuizAttempt.date_attempted.desc())
+
+        pagination = base_query.paginate(page=page, per_page=limit, error_out=False)
+        return jsonify({
+            'items': [_serialize_quiz_attempt(a) for a in pagination.items],
+            'page': page,
+            'limit': limit,
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'has_next': pagination.has_next,
+            'has_prev': pagination.has_prev
+        }), 200
+
+    data = request.get_json() or {}
+    answers = data.get('answers', {})
+    if not isinstance(answers, dict):
+        return jsonify({'error': 'answers must be an object keyed by question index'}), 400
+
+    questions = _safe_load_json(quiz_set.content, [])
+    if not isinstance(questions, list) or len(questions) == 0:
+        return jsonify({'error': 'Quiz content is invalid or empty'}), 422
+
+    score = 0
+    for idx, question in enumerate(questions):
+        selected = answers.get(str(idx))
+        correct_answer = question.get('answer') if isinstance(question, dict) else None
+        if selected is not None and selected == correct_answer:
+            score += 1
+
+    attempt = QuizAttempt(
+        score=score,
+        total_questions=len(questions),
+        answers_json=json.dumps(answers),
+        user_id=current_user.id,
+        quiz_set_id=quiz_set.id
+    )
+    db.session.add(attempt)
+    db.session.commit()
+
+    return jsonify(_serialize_quiz_attempt(attempt)), 201
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -395,9 +549,13 @@ def logout():
 
 
 @app.route("/api/account", methods=['GET'])
-@login_required
 def account():
-    return jsonify({'username': current_user.username, 'email': current_user.email})
+    if not current_user.is_authenticated:
+        return jsonify({'authenticated': False, 'user': None}), 200
+    return jsonify({
+        'authenticated': True,
+        'user': {'username': current_user.username, 'email': current_user.email}
+    }), 200
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #   TODO ENDPOINTS
@@ -423,14 +581,6 @@ def handle_todos():
         db.session.add(new_todo)
         db.session.commit()
         return jsonify({'id': new_todo.id, 'text': new_todo.text, 'completed': new_todo.completed, 'note_id': new_todo.note_id}), 201
-
-@app.route("/api/notes", methods=['GET', 'OPTIONS'])
-@login_required
-def get_all_notes():
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'}), 200
-    notes = StudyNote.query.filter_by(user_id=current_user.id).all()
-    return jsonify([{'id': n.id, 'filename': n.filename} for n in notes]), 200
 
 @app.route("/api/todos/<int:todo_id>", methods=['PATCH', 'DELETE', 'OPTIONS'])
 @login_required
